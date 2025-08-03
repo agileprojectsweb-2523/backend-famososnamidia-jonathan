@@ -6,25 +6,27 @@ const config = require('../config/config'); // <<< VERIFIQUE ESTA LINHA
 
 const registerUser = async (userData) => {
   try {
-    const { name, email, password, role } = userData; // <<< Permitir 'role' do payload
+    const { name, email, password, role } = userData;
 
+    // A verificação de email existente já está correta.
     const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
     if (existingUser) {
       throw new Error('Este email já está cadastrado.');
     }
 
+    // CORREÇÃO AQUI:
+    // Mude de 'passwordHash: password' para 'password: password'
+    // O hook do modelo User se encarregará de fazer o hash e salvar em 'passwordHash'
     const newUser = await User.create({
       name,
       email,
-      passwordHash: password, 
-      role: role || 'user', // <<< Usar 'role' do payload ou 'user' como padrão
-      // OU para criar o primeiro admin, você poderia fixar:
-      // role: 'admin', // <<< CUIDADO: APENAS PARA O PRIMEIRO REGISTRO, DEPOIS REMOVA/COMENTE
+      password: password, // <--- LINHA CORRIGIDA
+      role: role || 'user',
     });
 
     const userResponse = newUser.toJSON();
     delete userResponse.passwordHash;
-    return userResponse; // O backend /auth/register devolve apenas uma mensagem
+    return userResponse;
   } catch (error) {
     console.error('Erro no serviço de registro:', error.message);
     throw error;
