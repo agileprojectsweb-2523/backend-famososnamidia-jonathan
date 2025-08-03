@@ -4,10 +4,21 @@ const authService = require('../services/auth.service');
 
 const register = async (req, res) => {
   try {
-    const user = await authService.registerUser(req.body);
-    // Não retornar o objeto usuário inteiro no registro público por segurança, apenas uma mensagem
+    // <<< INÍCIO DA VALIDAÇÃO ADICIONADA
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ 
+        message: 'Campos obrigatórios ausentes. É necessário enviar name, email e password.' 
+      });
+    }
+    // FIM DA VALIDAÇÃO ADICIONADA >>>
+
+    // O req.body inteiro é passado para o serviço, que saberá lidar com o campo 'role'
+    const user = await authService.registerUser(req.body); 
+    
     res.status(201).json({ message: 'Usuário registrado com sucesso! Faça login para continuar.' });
   } catch (error) {
+    // Retorna um erro 400 (Bad Request) para erros de validação ou de email já existente
     res.status(400).json({ message: error.message || 'Erro ao registrar usuário.' });
   }
 };
