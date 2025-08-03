@@ -14,6 +14,7 @@ const register = async (req, res) => {
   } catch (error) {
     res.status(400).json({ message: error.message || 'Erro ao registrar usuário.' });
   }
+}
 
 const login = async (req, res) => {
   try {
