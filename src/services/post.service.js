@@ -19,25 +19,70 @@ const createPost = async (postData, authorId) => {
   }
 };
 
-const getAllPosts = async ({ page = 1, limit = 10, search = '', categorySlug = null, status = 'published', sortBy = 'publishedAt', sortOrder = 'DESC', authorId = null }) => { // <<< 1. ADICIONE authorId AQUI
+const getAllPosts = async ({ page = 1, limit = 10, search = '', categorySlug = null, status = 'published', sortBy = 'publishedAt', sortOrder = 'DESC' }) => {
   try {
     const offset = (page - 1) * limit;
-    let whereClause = { status }; 
+    let whereClause = { status }; // Por padrão, busca apenas posts publicados
     
-    if (status === 'all') {
+    if (status === 'all') { // Permitir buscar todos os status (para dashboard)
         delete whereClause.status;
     }
 
-    // <<< 2. ADICIONE ESTE BLOCO if ABAIXO >>>
-    if (authorId) {
-      whereClause.authorId = parseInt(authorId, 10);
-    }
 
     if (search) {
-      // ... (resto da lógica de busca)
+      whereClause[Op.or] = [
+        { title: { [Op.iLike]: `%${search}%` } },
+        { excerpt: { [Op.iLike]: `%${search}%` } },
+        { content: { [Op.iLike]: `%${search}%` } },
+      ];
     }
 
-    // ... (resto da função como está)
+    let includeOptions = [
+      { model: User, as: 'author', attributes: ['id', 'name', 'profileImageUrl', 'profileUrl', 'bio'] }, // Inclui campos de perfil
+      { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
+    ];
+
+    if (categorySlug) {
+      // Busca a categoria pelo slug para obter o ID
+      const category = await Category.findOne({ where: { slug: categorySlug } });
+      if (category) {
+        whereClause.categoryId = category.id;
+      } else {
+        // Se a categoria não existir, retorna array vazio ou lança erro
+        return { totalItems: 0, posts: [], totalPages: 0, currentPage: parseInt(page,10) };
+      }
+    }
+    
+    const validSortOrders = ['ASC', 'DESC'];
+    const orderDirection = validSortOrders.includes(sortOrder.toUpperCase()) ? sortOrder.toUpperCase() : 'DESC';
+    
+    let orderClause;
+    
+    // Se sortBy for 'custom', usa sortOrder personalizada
+    if (sortBy === 'custom') {
+      orderClause = [
+        [sequelize.literal('CASE WHEN "sortOrder" IS NULL THEN 1 ELSE 0 END'), 'ASC'], // Posts sem ordem vão para o final
+        ['sortOrder', 'ASC'], // Ordem personalizada crescente
+        ['publishedAt', 'DESC'], // Ordenação secundária por data de publicação
+        ['id', 'DESC'] // Ordenação terciária por ID
+      ];
+    } else {
+      orderClause = [[sortBy, orderDirection]];
+      if (sortBy === 'createdAt' && !['publishedAt', 'updatedAt'].includes(sortBy)) { // Evita duplicidade se sortBy for createdAt
+          orderClause.push(['id', orderDirection]); // Ordenação secundária para consistência
+      }
+    }
+
+
+    const { count, rows } = await Post.findAndCountAll({
+      where: whereClause,
+      include: includeOptions,
+      limit: parseInt(limit, 10),
+      offset: parseInt(offset, 10),
+      order: orderClause,
+      distinct: true, // Importante para count correto com includes
+    });
+    return { totalItems: count, posts: rows, totalPages: Math.ceil(count / limit), currentPage: parseInt(page, 10) };
   } catch (error) {
     throw error;
   }

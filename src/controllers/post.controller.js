@@ -13,10 +13,12 @@ const createPost = async (req, res) => {
 
 const getAllPosts = async (req, res) => {
   try {
-    const { page, limit, search, categorySlug, status, sortBy, sortOrder, authorId } = req.query; // <<< ADICIONE authorId AQUI
+    const { page, limit, search, categorySlug, status, sortBy, sortOrder } = req.query;
+    // Para rotas públicas, geralmente queremos apenas 'published'
+    // Para dashboard, o admin pode querer ver 'all' status
     const postStatus = req.path.includes('/dashboard') ? status : 'published';
 
-    const result = await postService.getAllPosts({ page, limit, search, categorySlug, status: postStatus, sortBy, sortOrder, authorId }); // <<< PASSE authorId AQUI
+    const result = await postService.getAllPosts({ page, limit, search, categorySlug, status: postStatus, sortBy, sortOrder });
     res.status(200).json(result);
   } catch (error) {
     console.error("Erro ao buscar posts:", error);
