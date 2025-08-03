@@ -1,7 +1,7 @@
 // src/auth/auth.routes.js
 const express = require('express');
-const authController = require('./auth.controller');
-const { authenticateToken } = require('./auth.middleware'); // Middleware de autenticação
+const authController = require('../controllers/auth.controller');
+const { authenticateToken } = require('../middleware/auth.middleware'); // Middleware de autenticação
 
 const router = express.Router();
 

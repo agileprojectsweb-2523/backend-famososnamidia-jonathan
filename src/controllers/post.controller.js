@@ -66,10 +66,42 @@ const deletePost = async (req, res) => {
   }
 };
 
+const reorderPosts = async (req, res) => {
+  try {
+    const { postOrders } = req.body; // Array de { id, sortOrder }
+    if (!Array.isArray(postOrders)) {
+      return res.status(400).json({ message: 'postOrders deve ser um array.' });
+    }
+    
+    const result = await postService.reorderPosts(postOrders);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const movePostToPosition = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { position } = req.body;
+    
+    if (typeof position !== 'number' || position < 0) {
+      return res.status(400).json({ message: 'Posição deve ser um número não negativo.' });
+    }
+    
+    const result = await postService.movePostToPosition(parseInt(id), position);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(error.message.includes('não encontrado') ? 404 : 500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createPost,
   getAllPosts,
   getPost,
   updatePost,
   deletePost,
+  reorderPosts,
+  movePostToPosition,
 };

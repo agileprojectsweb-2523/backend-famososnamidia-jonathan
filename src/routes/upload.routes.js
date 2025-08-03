@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const upload = require('../config/multer.config'); // Nossa configuração do Multer
-const { authenticateToken, authorizeRole } = require('../auth/auth.middleware'); // Protege a rota
+const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
 
 // POST /api/v1/upload/image
 // Rota para fazer upload de uma única imagem

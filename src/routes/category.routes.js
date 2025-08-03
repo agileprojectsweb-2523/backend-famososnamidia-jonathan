@@ -1,7 +1,7 @@
 // src/routes/category.routes.js
 const express = require('express');
 const categoryController = require('../controllers/category.controller');
-const { authenticateToken, authorizeRole } = require('../auth/auth.middleware');
+const { authenticateToken, authorizeRole } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 

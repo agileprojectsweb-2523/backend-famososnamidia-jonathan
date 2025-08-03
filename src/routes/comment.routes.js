@@ -2,7 +2,7 @@
 const express = require('express');
 const commentController = require('../controllers/comment.controller');
 // Removido authorizeRole daqui, pois authenticateToken é opcional
-const { authenticateToken, softAuthenticateToken, authorizeRole } = require('../auth/auth.middleware'); 
+const { authenticateToken, authorizeRole, softAuthenticateToken } = require('../middleware/auth.middleware');
 
 const router = express.Router();
 

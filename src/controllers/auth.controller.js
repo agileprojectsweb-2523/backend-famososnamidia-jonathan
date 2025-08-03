@@ -1,5 +1,5 @@
 // src/auth/auth.controller.js
-const authService = require('./auth.service');
+const authService = require('../services/auth.service');
 // (Opcional) const userService = require('../services/user.service'); // Se getMe ficar aqui
 
 const register = async (req, res) => {

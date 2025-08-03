@@ -1,6 +1,6 @@
 // src/routes/index.routes.js
 const express = require('express');
-const authRoutes = require('../auth/auth.routes');
+const authRoutes = require('./auth.routes');
 const userRoutes = require('./user.routes');
 const categoryRoutes = require('./category.routes');
 const postRoutes = require('./post.routes');

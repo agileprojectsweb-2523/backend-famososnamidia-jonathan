@@ -35,6 +35,38 @@ const User = sequelize.define('User', {
     type: DataTypes.ENUM('admin', 'author', 'user'), // 'user' para leitores que podem comentar logados
     defaultValue: 'user',
     allowNull: false,
+  },
+  profileImageUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isUrlOrNull(value) {
+        if (value !== null && value !== '' && !validator.isURL(value)) {
+          throw new Error('Forneça uma URL de imagem válida ou deixe o campo vazio.');
+        }
+      }
+    },
+    comment: 'URL da foto de perfil do usuário'
+  },
+  profileUrl: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    validate: {
+      isUrlOrNull(value) {
+        if (value !== null && value !== '' && !validator.isURL(value)) {
+          throw new Error('Forneça uma URL válida ou deixe o campo vazio.');
+        }
+      }
+    },
+    comment: 'URL do perfil/site pessoal do usuário'
+  },
+  bio: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    validate: {
+      len: { args: [0, 500], msg: 'A biografia deve ter no máximo 500 caracteres.' }
+    },
+    comment: 'Biografia curta do usuário'
   }
 }, {
   tableName: 'users',

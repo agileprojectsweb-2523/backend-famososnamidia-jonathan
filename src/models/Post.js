@@ -66,6 +66,32 @@ const Post = sequelize.define('Post', {
     type: DataTypes.DATE,
     allowNull: true, // Se for draft, pode ser nulo
   },
+  sortOrder: { // Campo para ordenação personalizada
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    defaultValue: null,
+    comment: 'Ordem personalizada para exibição dos posts'
+  },
+  focalPointX: { // Ponto focal X da imagem (porcentagem)
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+    defaultValue: 50.00,
+    validate: {
+      min: 0,
+      max: 100
+    },
+    comment: 'Posição X do ponto focal da imagem em porcentagem (0-100)'
+  },
+  focalPointY: { // Ponto focal Y da imagem (porcentagem)
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+    defaultValue: 50.00,
+    validate: {
+      min: 0,
+      max: 100
+    },
+    comment: 'Posição Y do ponto focal da imagem em porcentagem (0-100)'
+  },
   // authorId e categoryId serão definidos pelas associações
 }, {
   tableName: 'posts',
@@ -97,7 +123,8 @@ const Post = sequelize.define('Post', {
   indexes: [
     { unique: true, fields: ['slug'] },
     { fields: ['status'] },
-    { fields: ['publishedAt'] }
+    { fields: ['publishedAt'] },
+    { fields: ['sortOrder'] }
   ]
 });
 

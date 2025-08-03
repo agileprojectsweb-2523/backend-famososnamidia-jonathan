@@ -38,7 +38,7 @@ const getAllPosts = async ({ page = 1, limit = 10, search = '', categorySlug = n
     }
 
     let includeOptions = [
-      { model: User, as: 'author', attributes: ['id', 'name'] }, // Inclui autor, exclui senha
+      { model: User, as: 'author', attributes: ['id', 'name', 'profileImageUrl', 'profileUrl', 'bio'] }, // Inclui campos de perfil
       { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
     ];
 
@@ -56,9 +56,21 @@ const getAllPosts = async ({ page = 1, limit = 10, search = '', categorySlug = n
     const validSortOrders = ['ASC', 'DESC'];
     const orderDirection = validSortOrders.includes(sortOrder.toUpperCase()) ? sortOrder.toUpperCase() : 'DESC';
     
-    let orderClause = [[sortBy, orderDirection]];
-    if (sortBy === 'createdAt' && !['publishedAt', 'updatedAt'].includes(sortBy)) { // Evita duplicidade se sortBy for createdAt
-        orderClause.push(['id', orderDirection]); // Ordenação secundária para consistência
+    let orderClause;
+    
+    // Se sortBy for 'custom', usa sortOrder personalizada
+    if (sortBy === 'custom') {
+      orderClause = [
+        [sequelize.literal('CASE WHEN "sortOrder" IS NULL THEN 1 ELSE 0 END'), 'ASC'], // Posts sem ordem vão para o final
+        ['sortOrder', 'ASC'], // Ordem personalizada crescente
+        ['publishedAt', 'DESC'], // Ordenação secundária por data de publicação
+        ['id', 'DESC'] // Ordenação terciária por ID
+      ];
+    } else {
+      orderClause = [[sortBy, orderDirection]];
+      if (sortBy === 'createdAt' && !['publishedAt', 'updatedAt'].includes(sortBy)) { // Evita duplicidade se sortBy for createdAt
+          orderClause.push(['id', orderDirection]); // Ordenação secundária para consistência
+      }
     }
 
 
@@ -80,7 +92,7 @@ const getPostById = async (id) => {
   try {
     const post = await Post.findByPk(id, {
       include: [
-        { model: User, as: 'author', attributes: ['id', 'name'] },
+        { model: User, as: 'author', attributes: ['id', 'name', 'profileImageUrl', 'profileUrl', 'bio'] },
         { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
         {
           model: Comment,
@@ -107,7 +119,7 @@ const getPostBySlug = async (slug) => {
     const post = await Post.findOne({
       where: { slug, status: 'published' }, // Apenas posts publicados por slug
       include: [
-        { model: User, as: 'author', attributes: ['id', 'name'] },
+        { model: User, as: 'author', attributes: ['id', 'name', 'profileImageUrl', 'profileUrl', 'bio'] },
         { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
         {
           model: Comment,
@@ -169,3 +181,94 @@ module.exports = {
   updatePost,
   deletePost,
 };
+
+// Função para reordenar posts
+const reorderPosts = async (postOrders) => {
+  try {
+    const transaction = await sequelize.transaction();
+    
+    try {
+      // postOrders é um array de objetos { id, sortOrder }
+      for (const { id, sortOrder } of postOrders) {
+        await Post.update(
+          { sortOrder },
+          { 
+            where: { id },
+            transaction
+          }
+        );
+      }
+      
+      await transaction.commit();
+      return { message: 'Posts reordenados com sucesso.' };
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Função para mover um post para uma posição específica
+const movePostToPosition = async (postId, newPosition) => {
+  try {
+    const transaction = await sequelize.transaction();
+    
+    try {
+      // Busca o post que será movido
+      const postToMove = await Post.findByPk(postId, { transaction });
+      if (!postToMove) {
+        throw new Error('Post não encontrado.');
+      }
+      
+      // Busca todos os posts ordenados pela posição atual
+      const allPosts = await Post.findAll({
+        order: [
+          [sequelize.literal('CASE WHEN "sortOrder" IS NULL THEN 1 ELSE 0 END'), 'ASC'],
+          ['sortOrder', 'ASC'],
+          ['publishedAt', 'DESC'],
+          ['id', 'DESC']
+        ],
+        transaction
+      });
+      
+      // Remove o post da lista atual
+      const filteredPosts = allPosts.filter(p => p.id !== postId);
+      
+      // Insere o post na nova posição
+      filteredPosts.splice(newPosition, 0, postToMove);
+      
+      // Atualiza a ordem de todos os posts
+      for (let i = 0; i < filteredPosts.length; i++) {
+        await Post.update(
+          { sortOrder: i + 1 },
+          { 
+            where: { id: filteredPosts[i].id },
+            transaction
+          }
+        );
+      }
+      
+      await transaction.commit();
+      return { message: 'Post movido com sucesso.' };
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    throw error;
+  }
+};
+
+module.exports = {
+  createPost,
+  getAllPosts,
+  getPostById,
+  getPostBySlug,
+  updatePost,
+  deletePost,
+  reorderPosts,
+  movePostToPosition,
+};
+
