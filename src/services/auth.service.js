@@ -4,32 +4,46 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const config = require('../config/config'); // <<< VERIFIQUE ESTA LINHA
 
+
 const registerUser = async (userData) => {
   try {
     const { name, email, password, role } = userData;
 
-    // A verificação de email existente já está correta.
+    // Validação extra para garantir que os dados chegaram
+    if (!name || !email || !password) {
+      throw new Error("Nome, email e senha são obrigatórios.");
+    }
+
     const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
     if (existingUser) {
       throw new Error('Este email já está cadastrado.');
     }
 
-    // CORREÇÃO AQUI:
-    // Mude de 'passwordHash: password' para 'password: password'
-    // O hook do modelo User se encarregará de fazer o hash e salvar em 'passwordHash'
+    // --- INÍCIO DA CORREÇÃO CRÍTICA ---
+
+    // 1. Gerar o "sal" para o hash. Um valor de 10 é seguro e padrão.
+    const salt = await bcrypt.genSalt(10);
+    
+    // 2. Criptografar a senha recebida usando o sal gerado.
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // 3. Criar o novo usuário no banco de dados com a SENHA CRIPTOGRAFADA.
     const newUser = await User.create({
       name,
-      email,
-      password: password, // <--- LINHA CORRIGIDA
+      email: email.toLowerCase(), // É uma boa prática salvar emails em minúsculo
+      passwordHash: hashedPassword, // Agora passamos o hash para o campo correto
       role: role || 'user',
     });
 
+    // --- FIM DA CORREÇÃO CRÍTICA ---
+
     const userResponse = newUser.toJSON();
-    delete userResponse.passwordHash;
+    delete userResponse.passwordHash; // Remove o hash da resposta por segurança
     return userResponse;
   } catch (error) {
-    console.error('Erro no serviço de registro:', error.message);
-    throw error;
+    // Log do erro completo para ajudar em futuras depurações
+    console.error('Erro detalhado no serviço de registro:', error);
+    throw new Error(error.message || 'Ocorreu um erro interno ao registrar o usuário.');
   }
 };
 const loginUser = async (email, password) => {
