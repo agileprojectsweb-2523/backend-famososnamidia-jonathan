@@ -77,7 +77,7 @@ const syncDatabase = async () => {
     // Sincroniza todos os modelos. Use { alter: true } em dev para evitar perda de dados
     // ou { force: true } em dev se quiser dropar e recriar tabelas a cada execução.
     // NUNCA use { force: true } em produção!
-    await db.sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
+await db.sequelize.sync({ force: true });
     console.log('Banco de dados sincronizado com sucesso.');
   } catch (error) {
     console.error('Erro ao sincronizar o banco de dados:', error);
