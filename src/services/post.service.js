@@ -4,8 +4,13 @@ const { Op } = require('sequelize');
 
 const createPost = async (postData, authorId) => {
   try {
-    // O slug será gerado pelo hook
-    // A data de publicação será definida se status for 'published'
+    // <<< MUDANÇA: Validação para posts agendados
+    if (postData.status === 'scheduled') {
+      if (!postData.publishedAt || new Date(postData.publishedAt) <= new Date()) {
+        throw new Error('Para agendar um post, a data de publicação (publishedAt) deve ser uma data futura.');
+      }
+    }
+
     const post = await Post.create({ ...postData, authorId });
     return post;
   } catch (error) {
@@ -22,9 +27,10 @@ const createPost = async (postData, authorId) => {
 const getAllPosts = async ({ page = 1, limit = 10, search = '', categorySlug = null, status = 'published', sortBy = 'publishedAt', sortOrder = 'DESC' }) => {
   try {
     const offset = (page - 1) * limit;
-    let whereClause = { status }; // Por padrão, busca apenas posts publicados
+    let whereClause = { status };
     
-    if (status === 'all') { // Permitir buscar todos os status (para dashboard)
+    // <<< SEM MUDANÇA: Esta lógica já suporta seu requisito para o dashboard
+    if (status === 'all') { 
         delete whereClause.status;
     }
 
@@ -38,17 +44,15 @@ const getAllPosts = async ({ page = 1, limit = 10, search = '', categorySlug = n
     }
 
     let includeOptions = [
-      { model: User, as: 'author', attributes: ['id', 'name', 'profileImageUrl', 'profileUrl', 'bio'] }, // Inclui campos de perfil
+      { model: User, as: 'author', attributes: ['id', 'name', 'profileImageUrl', 'profileUrl', 'bio'] },
       { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
     ];
 
     if (categorySlug) {
-      // Busca a categoria pelo slug para obter o ID
       const category = await Category.findOne({ where: { slug: categorySlug } });
       if (category) {
         whereClause.categoryId = category.id;
       } else {
-        // Se a categoria não existir, retorna array vazio ou lança erro
         return { totalItems: 0, posts: [], totalPages: 0, currentPage: parseInt(page,10) };
       }
     }
@@ -58,18 +62,17 @@ const getAllPosts = async ({ page = 1, limit = 10, search = '', categorySlug = n
     
     let orderClause;
     
-    // Se sortBy for 'custom', usa sortOrder personalizada
     if (sortBy === 'custom') {
       orderClause = [
-        [sequelize.literal('CASE WHEN "sortOrder" IS NULL THEN 1 ELSE 0 END'), 'ASC'], // Posts sem ordem vão para o final
-        ['sortOrder', 'ASC'], // Ordem personalizada crescente
-        ['publishedAt', 'DESC'], // Ordenação secundária por data de publicação
-        ['id', 'DESC'] // Ordenação terciária por ID
+        [sequelize.literal('CASE WHEN "sortOrder" IS NULL THEN 1 ELSE 0 END'), 'ASC'],
+        ['sortOrder', 'ASC'],
+        ['publishedAt', 'DESC'],
+        ['id', 'DESC']
       ];
     } else {
       orderClause = [[sortBy, orderDirection]];
-      if (sortBy === 'createdAt' && !['publishedAt', 'updatedAt'].includes(sortBy)) { // Evita duplicidade se sortBy for createdAt
-          orderClause.push(['id', orderDirection]); // Ordenação secundária para consistência
+      if (sortBy === 'createdAt' && !['publishedAt', 'updatedAt'].includes(sortBy)) {
+          orderClause.push(['id', orderDirection]);
       }
     }
 
@@ -80,7 +83,7 @@ const getAllPosts = async ({ page = 1, limit = 10, search = '', categorySlug = n
       limit: parseInt(limit, 10),
       offset: parseInt(offset, 10),
       order: orderClause,
-      distinct: true, // Importante para count correto com includes
+      distinct: true,
     });
     return { totalItems: count, posts: rows, totalPages: Math.ceil(count / limit), currentPage: parseInt(page, 10) };
   } catch (error) {
@@ -97,16 +100,11 @@ const getPostById = async (id) => {
         {
           model: Comment,
           as: 'comments',
-          include: [{ model: User, as: 'user', attributes: ['id', 'name'] }], // Inclui usuário do comentário
+          include: [{ model: User, as: 'user', attributes: ['id', 'name'] }],
           order: [['createdAt', 'DESC']]
         }
       ]
     });
-    if (!post || (post.status !== 'published' && /* lógica para permitir ver drafts para admin */ false )) {
-        // A condição de ver drafts precisará de lógica de autenticação/autorização
-        // Por enquanto, só mostra publicados
-        // if (!post) throw new Error('Post não encontrado.'); // Se quiser mostrar drafts para admin, remova a checagem de status aqui.
-    }
     if (!post) throw new Error('Post não encontrado.');
     return post;
   } catch (error) {
@@ -117,7 +115,7 @@ const getPostById = async (id) => {
 const getPostBySlug = async (slug) => {
   try {
     const post = await Post.findOne({
-      where: { slug, status: 'published' }, // Apenas posts publicados por slug
+      where: { slug, status: 'published' },
       include: [
         { model: User, as: 'author', attributes: ['id', 'name', 'profileImageUrl', 'profileUrl', 'bio'] },
         { model: Category, as: 'category', attributes: ['id', 'name', 'slug'] },
@@ -138,13 +136,15 @@ const getPostBySlug = async (slug) => {
 
 const updatePost = async (id, updateData, userId, userRole) => {
   try {
+    // <<< MUDANÇA: Validação para posts agendados
+    if (updateData.status === 'scheduled') {
+        if (!updateData.publishedAt || new Date(updateData.publishedAt) <= new Date()) {
+            throw new Error('Para agendar um post, a data de publicação (publishedAt) deve ser uma data futura.');
+        }
+    }
+
     const post = await Post.findByPk(id);
     if (!post) throw new Error('Post não encontrado.');
-
-    // Opcional: Verificar se o usuário é o autor ou admin para permitir edição
-    // if (userRole !== 'admin' && post.authorId !== userId) {
-    //   throw new Error('Não autorizado a editar este post.');
-    // }
 
     await post.update(updateData);
     return post;
@@ -160,11 +160,6 @@ const deletePost = async (id, userId, userRole) => {
   try {
     const post = await Post.findByPk(id);
     if (!post) throw new Error('Post não encontrado.');
-
-    // Opcional: Verificar se o usuário é o autor ou admin
-    // if (userRole !== 'admin' && post.authorId !== userId) {
-    //   throw new Error('Não autorizado a deletar este post.');
-    // }
     
     await post.destroy();
     return { message: 'Post deletado com sucesso.' };
@@ -173,90 +168,78 @@ const deletePost = async (id, userId, userRole) => {
   }
 };
 
-module.exports = {
-  createPost,
-  getAllPosts,
-  getPostById,
-  getPostBySlug,
-  updatePost,
-  deletePost,
-};
-
-// Função para reordenar posts
 const reorderPosts = async (postOrders) => {
+  const transaction = await sequelize.transaction();
   try {
-    const transaction = await sequelize.transaction();
-    
-    try {
-      // postOrders é um array de objetos { id, sortOrder }
-      for (const { id, sortOrder } of postOrders) {
-        await Post.update(
-          { sortOrder },
-          { 
-            where: { id },
-            transaction
-          }
-        );
-      }
-      
-      await transaction.commit();
-      return { message: 'Posts reordenados com sucesso.' };
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
+    for (const { id, sortOrder } of postOrders) {
+      await Post.update({ sortOrder }, { where: { id }, transaction });
     }
+    await transaction.commit();
+    return { message: 'Posts reordenados com sucesso.' };
   } catch (error) {
+    await transaction.rollback();
     throw error;
   }
 };
 
-// Função para mover um post para uma posição específica
 const movePostToPosition = async (postId, newPosition) => {
+  const transaction = await sequelize.transaction();
   try {
-    const transaction = await sequelize.transaction();
+    const postToMove = await Post.findByPk(postId, { transaction });
+    if (!postToMove) throw new Error('Post não encontrado.');
     
-    try {
-      // Busca o post que será movido
-      const postToMove = await Post.findByPk(postId, { transaction });
-      if (!postToMove) {
-        throw new Error('Post não encontrado.');
-      }
-      
-      // Busca todos os posts ordenados pela posição atual
-      const allPosts = await Post.findAll({
-        order: [
-          [sequelize.literal('CASE WHEN "sortOrder" IS NULL THEN 1 ELSE 0 END'), 'ASC'],
-          ['sortOrder', 'ASC'],
-          ['publishedAt', 'DESC'],
-          ['id', 'DESC']
-        ],
-        transaction
-      });
-      
-      // Remove o post da lista atual
-      const filteredPosts = allPosts.filter(p => p.id !== postId);
-      
-      // Insere o post na nova posição
-      filteredPosts.splice(newPosition, 0, postToMove);
-      
-      // Atualiza a ordem de todos os posts
-      for (let i = 0; i < filteredPosts.length; i++) {
-        await Post.update(
-          { sortOrder: i + 1 },
-          { 
-            where: { id: filteredPosts[i].id },
-            transaction
-          }
-        );
-      }
-      
-      await transaction.commit();
-      return { message: 'Post movido com sucesso.' };
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
+    const allPosts = await Post.findAll({
+      order: [
+        [sequelize.literal('CASE WHEN "sortOrder" IS NULL THEN 1 ELSE 0 END'), 'ASC'],
+        ['sortOrder', 'ASC'],
+        ['publishedAt', 'DESC'],
+        ['id', 'DESC']
+      ],
+      transaction
+    });
+    
+    const filteredPosts = allPosts.filter(p => p.id !== postId);
+    filteredPosts.splice(newPosition, 0, postToMove);
+    
+    for (let i = 0; i < filteredPosts.length; i++) {
+      await Post.update({ sortOrder: i + 1 }, { where: { id: filteredPosts[i].id }, transaction });
     }
+    
+    await transaction.commit();
+    return { message: 'Post movido com sucesso.' };
   } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
+};
+
+// <<< MUDANÇA: Nova função para o agendador (cron job)
+/**
+ * Encontra e publica posts cujo status é 'scheduled' e a data de publicação já passou.
+ * @returns {Promise<{message: string, count: number}>}
+ */
+const publishScheduledPosts = async () => {
+  try {
+    const [affectedCount] = await Post.update(
+      { status: 'published' }, // O que atualizar
+      { // Onde atualizar
+        where: {
+          status: 'scheduled',
+          publishedAt: {
+            [Op.lte]: new Date() // lte = Less Than or Equal to (menor ou igual a)
+          }
+        },
+        returning: false // Não precisa retornar os registros atualizados
+      }
+    );
+
+    if (affectedCount > 0) {
+      console.log(`[Scheduler] Publicados ${affectedCount} posts agendados.`);
+    }
+
+    return { message: 'Verificação de posts agendados concluída.', count: affectedCount };
+  } catch (error) {
+    console.error('[Scheduler] Erro ao publicar posts agendados:', error);
     throw error;
   }
 };
@@ -270,5 +253,5 @@ module.exports = {
   deletePost,
   reorderPosts,
   movePostToPosition,
+  publishScheduledPosts, // <<< MUDANÇA: Exporta a nova função
 };
-

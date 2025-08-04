@@ -21,7 +21,8 @@ module.exports = (sequelize, DataTypes) => {
     excerpt: { type: DataTypes.TEXT, allowNull: false, validate: { notEmpty: { msg: 'O excerto (resumo) não pode estar vazio.' } } },
     content: { type: DataTypes.TEXT('long'), allowNull: false, validate: { notEmpty: { msg: 'O conteúdo do post não pode estar vazio.' } } },
     imageUrl: { type: DataTypes.STRING, allowNull: true, validate: { isUrlOrNull(value) { if (value && value !== '' && !validator.isURL(value)) throw new Error('Forneça uma URL de imagem válida ou deixe o campo vazio.'); } } },
-    status: { type: DataTypes.ENUM('published', 'draft', 'archived'), defaultValue: 'draft', allowNull: false },
+    // <<< MUDANÇA: Adicionado o status 'scheduled'
+    status: { type: DataTypes.ENUM('published', 'draft', 'archived', 'scheduled'), defaultValue: 'draft', allowNull: false },
     publishedAt: { type: DataTypes.DATE, allowNull: true },
     sortOrder: { type: DataTypes.INTEGER, allowNull: true, defaultValue: null, comment: 'Ordem personalizada para exibição dos posts' },
     focalPointX: { type: DataTypes.DECIMAL(5, 2), allowNull: true, defaultValue: 50.00, validate: { min: 0, max: 100 }, comment: 'Posição X do ponto focal da imagem em porcentagem (0-100)' },

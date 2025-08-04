@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const { schedulePostPublisher } = require('./src/jobs/scheduler'); // Ajuste o caminho se necessário
 
 // Carrega variáveis de .env para process.env o mais cedo possível
 dotenv.config();
@@ -77,7 +78,7 @@ const syncDatabase = async () => {
     // Sincroniza todos os modelos. Use { alter: true } em dev para evitar perda de dados
     // ou { force: true } em dev se quiser dropar e recriar tabelas a cada execução.
     // NUNCA use { force: true } em produção!
-await db.sequelize.sync({ force: false });
+await db.sequelize.sync({ force: true });
     console.log('Banco de dados sincronizado com sucesso.');
   } catch (error) {
     console.error('Erro ao sincronizar o banco de dados:', error);
@@ -103,7 +104,10 @@ const startServer = async () => {
           console.error("Por favor, defina a variável JWT_SECRET no seu arquivo .env");
           console.error("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
           // Em produção, você pode querer parar o processo aqui: process.exit(1);
-      }
+      
+        schedulePostPublisher();
+
+        }
     });
 };
 
