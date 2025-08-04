@@ -254,4 +254,4 @@ module.exports = {
   reorderPosts,
   movePostToPosition,
   publishScheduledPosts, // <<< MUDANÇA: Exporta a nova função
-};
+};  
